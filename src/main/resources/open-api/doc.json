@@ -1,0 +1,380 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenAPI definition",
+    "version": "v0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Availability API",
+      "description": "Check cleaner availability for bookings"
+    },
+    {
+      "name": "Booking API",
+      "description": "Create and manage cleaning service bookings"
+    }
+  ],
+  "paths": {
+    "/api/bookings/{bookingId}": {
+      "put": {
+        "tags": [
+          "Booking API"
+        ],
+        "summary": "Update booking date/time",
+        "operationId": "updateBooking",
+        "parameters": [
+          {
+            "name": "bookingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingUpdateRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Booking updated",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid update or no availability",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Booking not found",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bookings": {
+      "post": {
+        "tags": [
+          "Booking API"
+        ],
+        "summary": "Create new booking",
+        "description": "Auto-selects available vehicle and cleaners",
+        "operationId": "createBooking",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingRequestDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Booking created",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input or no availability",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict - no available vehicle/cleaners",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/availability": {
+      "get": {
+        "tags": [
+          "Availability API"
+        ],
+        "summary": "Get availability by date or specific time slot",
+        "description": "**Mode 1:** date only → Returns per-cleaner free time slots (≥2hr)\n**Mode 2:** date + startTime + durationHours + cleanerCount → Returns available vehicles with sufficient cleaners\n",
+        "operationId": "getAvailability",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "description": "Date in yyyy-MM-dd format",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "startTime",
+            "in": "query",
+            "description": "Start time HH:mm (Mode 2 only)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "durationHours",
+            "in": "query",
+            "description": "Duration: TWO_HOURS or FOUR_HOURS (Mode 2 only)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "TWO_HOURS",
+                "FOUR_HOURS"
+              ]
+            }
+          },
+          {
+            "name": "cleanerCount",
+            "in": "query",
+            "description": "Number of cleaners needed (1-3, Mode 2 only)",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Availability found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CleanerAvailabilityDto"
+                      }
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VehicleAvailabilityDto"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid date/time or Friday",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "BookingUpdateRequestDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "startTime": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "startTime"
+        ]
+      },
+      "BookingResponseDto": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Booking ID"
+          },
+          "startDateTime": {
+            "type": "string",
+            "description": "Start datetime"
+          },
+          "endDateTime": {
+            "type": "string",
+            "description": "End datetime"
+          },
+          "vehicleId": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Vehicle assigned"
+          },
+          "cleanerIds": {
+            "type": "array",
+            "description": "Assigned cleaners",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        }
+      },
+      "BookingRequestDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Booking date",
+            "example": "2026-03-02"
+          },
+          "startTime": {
+            "type": "string",
+            "description": "Start time",
+            "example": "14:00"
+          },
+          "durationHours": {
+            "type": "string",
+            "description": "Duration",
+            "enum": [
+              "TWO_HOURS",
+              "FOUR_HOURS"
+            ],
+            "example": "TWO_HOURS"
+          },
+          "cleanerCount": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Number of cleaners",
+            "example": 2,
+            "maximum": 3,
+            "minimum": 1
+          }
+        },
+        "required": [
+          "cleanerCount",
+          "date",
+          "durationHours",
+          "startTime"
+        ]
+      },
+      "CleanerAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "cleanerId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "cleanerName": {
+            "type": "string"
+          },
+          "vehicleId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vehicleName": {
+            "type": "string"
+          },
+          "freeSlots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeSlotDto"
+            }
+          }
+        }
+      },
+      "TimeSlotDto": {
+        "type": "object",
+        "properties": {
+          "startTime": {
+            "type": "string"
+          },
+          "endTime": {
+            "type": "string"
+          }
+        }
+      },
+      "VehicleAvailabilityDto": {
+        "type": "object",
+        "properties": {
+          "vehicleId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "vehicleName": {
+            "type": "string"
+          },
+          "availableCleanerIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "requiredCleanerCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      }
+    }
+  }
+}
