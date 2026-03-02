@@ -27,6 +27,15 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     @Query("""
                 SELECT DISTINCT b FROM Booking b
+                WHERE b.vehicle = :vehicle
+                AND b.status = 'ACTIVE'
+                AND FUNCTION('DATE', b.startTime) = :date
+            """)
+    List<Booking> findByVehicleAndDate(@Param("vehicle") Vehicle vehicle,
+                                       @Param("date") LocalDate date);
+
+    @Query("""
+                SELECT DISTINCT b FROM Booking b
                 LEFT JOIN FETCH b.cleaners
                 WHERE b.status = 'ACTIVE'
                 AND FUNCTION('DATE', b.startTime) = :date

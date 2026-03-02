@@ -31,19 +31,13 @@
 
 ## 2. Vehicle Capacity Constraint (Critical)
 - **Vehicle = Shared Transportation Resource**
-- If **any cleaner** from Vehicle A is booked → Vehicle A blocked entirely for that slot
-- Cleaners from same vehicle can work together (1–3 per booking)
-- Different vehicles operate independently
-
-**Example: Vehicle A (C1–C5):**
-- 10:00–12:00: C1 ✓ → blocks C2,C3,C4,C5 at 10–12
-- 14:00–16:00: C1,C2 ✓ → Vehicle A free after 12:30 gap
-
-**Issues with this assumption and other option**
-- All 5 cleaners will never work simultaneously (for different bookings). This will cause wastage of manpower.
-- Better solution -> Vehicle will just be responsible for pickups and drops and won't be idle for entire slot. 
+- Vehicle will just be responsible for pickups and drops and won't be idle for entire slot.
 - We will just ensure 30 mins buffer between each pick up/drop.
-- Example :
+- This will ensure we can maximize cleaners scheduling.
+- Assumption : All pickup/drops can be reached withing 30 mins.
+
+
+- **Example** :
 - 10-12 : C1,C2 ✓
 - 10:30-12:30 : C3,C4 ✓
 - 11-13 : C5 ✓

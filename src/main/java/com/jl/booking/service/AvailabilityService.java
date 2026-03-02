@@ -68,7 +68,7 @@ public class AvailabilityService {
         validateTimeWindow(start, end);
 
         return vehicleRepository.findAllWithCleaners().stream()
-                .filter(vehicle -> isVehicleFree(vehicle, start, end, excludeBookingId))
+                .filter(vehicle -> isVehicleFree(vehicle, date, start, end, excludeBookingId))
                 .map(vehicle -> buildVehicleAvailability(vehicle, start, end, cleanerCount, excludeBookingId))
                 .filter(Objects::nonNull)
                 .toList();
@@ -86,15 +86,47 @@ public class AvailabilityService {
         return new VehicleAvailabilityDto(vehicle, availableCleaners, cleanerCount);
     }
 
-    private boolean isVehicleFree(Vehicle vehicle, LocalDateTime start, LocalDateTime end, Long excludeBookingId) {
-        LocalDateTime bufferedStart = start.minus(BREAK_DURATION);
-        LocalDateTime bufferedEnd = end.plus(BREAK_DURATION);
+    protected boolean isVehicleFree(Vehicle vehicle, LocalDate date,
+                                    LocalDateTime start, LocalDateTime end, Long excludeBookingId) {
 
-        List<Booking> overlapping = bookingRepository.findOverlappingBookingsWithCleaners(vehicle, bufferedStart, bufferedEnd);
+        List<Booking> allBookingsForDay =
+                bookingRepository.findByVehicleAndDate(vehicle, date);
+
         if (excludeBookingId != null) {
-            overlapping = excludeBooking(overlapping, excludeBookingId);
+            allBookingsForDay = excludeBooking(allBookingsForDay, excludeBookingId);
         }
-        return overlapping.isEmpty();
+
+        if (allBookingsForDay.isEmpty()) {
+            return true;
+        }
+
+        long bufferMinutes = BREAK_DURATION.toMinutes();
+
+        for (Booking booking : allBookingsForDay) {
+
+            LocalDateTime existingStart = booking.getStartTime();
+            LocalDateTime existingEnd = booking.getEndTime();
+
+            // Check new start against existing start & end
+            if (isWithinBuffer(start, existingStart, bufferMinutes) ||
+                    isWithinBuffer(start, existingEnd, bufferMinutes) ||
+
+                    // Check new end against existing start & end
+                    isWithinBuffer(end, existingStart, bufferMinutes) ||
+                    isWithinBuffer(end, existingEnd, bufferMinutes)) {
+
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean isWithinBuffer(LocalDateTime t1,
+                                   LocalDateTime t2,
+                                   long bufferMinutes) {
+
+        return Math.abs(Duration.between(t1, t2).toMinutes()) < bufferMinutes;
     }
 
     private List<Cleaner> getAvailableCleaners(Vehicle vehicle, LocalDateTime start, LocalDateTime end, Long excludeBookingId) {

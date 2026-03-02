@@ -26,6 +26,8 @@ import java.util.List;
 import static com.jl.booking.service.AvailabilityService.WORKING_END;
 import static com.jl.booking.service.AvailabilityService.WORKING_START;
 import static org.assertj.core.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
@@ -131,10 +133,10 @@ class AvailabilityServiceTest {
         LocalDate date = LocalDate.of(2026, 3, 2);
         LocalDateTime testStart = date.atTime(14, 0);
 
-        Booking overlappingBooking = createBooking(testStart.minusHours(1), testStart.plusHours(1));
+        Booking overlappingBooking = createBooking(testStart.minusMinutes(15), testStart.minusMinutes(30));
 
         when(vehicleRepository.findAllWithCleaners()).thenReturn(List.of(vehicle));
-        when(bookingRepository.findOverlappingBookingsWithCleaners(any(), any(), any()))
+        when(bookingRepository.findByVehicleAndDate(any(), any()))
                 .thenReturn(List.of(overlappingBooking));
 
         var result = availabilityService.getAvailabilityByTimeSlot(date, LocalTime.of(14, 0), DurationType.TWO_HOURS, 1);
@@ -147,7 +149,7 @@ class AvailabilityServiceTest {
         LocalDate date = LocalDate.of(2026, 3, 2);
 
         when(vehicleRepository.findAllWithCleaners()).thenReturn(List.of(vehicle));
-        when(bookingRepository.findOverlappingBookingsWithCleaners(any(), any(), any()))
+        when(bookingRepository.findByVehicleAndDate(any(), any()))
                 .thenReturn(List.of()); // Vehicle free
         when(bookingRepository.findByCleanerIdAndDate(1L, date)).thenReturn(List.of()); // Cleaner free
 
@@ -167,7 +169,8 @@ class AvailabilityServiceTest {
         Booking cleanerBooking = createBooking(testStart.minusHours(1), testEnd.plusHours(1));
 
         when(vehicleRepository.findAllWithCleaners()).thenReturn(List.of(vehicle));
-        when(bookingRepository.findOverlappingBookingsWithCleaners(any(), any(), any())).thenReturn(List.of());
+        when(bookingRepository.findByVehicleAndDate(any(), any()))
+                .thenReturn(List.of());
         when(bookingRepository.findByCleanerIdAndDate(1L, date)).thenReturn(List.of(cleanerBooking));
 
         var result = availabilityService.getAvailabilityByTimeSlot(date, LocalTime.of(10, 0), DurationType.TWO_HOURS, 1);
@@ -189,7 +192,8 @@ class AvailabilityServiceTest {
         Booking busyBooking2 = createBooking(date.atTime(10, 0), date.atTime(12, 0));
 
         when(vehicleRepository.findAllWithCleaners()).thenReturn(List.of(vehicle));
-        when(bookingRepository.findOverlappingBookingsWithCleaners(any(), any(), any())).thenReturn(List.of());
+        when(bookingRepository.findByVehicleAndDate(any(), any()))
+                .thenReturn(List.of());
 
         when(bookingRepository.findByCleanerIdAndDate(1L, date)).thenReturn(List.of(busyBooking1));
         when(bookingRepository.findByCleanerIdAndDate(2L, date)).thenReturn(List.of(busyBooking2));
@@ -202,6 +206,44 @@ class AvailabilityServiceTest {
         assertThat(result.getFirst().vehicleId()).isEqualTo(1L);
         assertThat(result.getFirst().availableCleanerIds()).containsExactlyInAnyOrder(3L, 4L);
         assertThat(result.getFirst().requiredCleanerCount()).isEqualTo(2);
+    }
+
+    @Test
+    void testIsVehicleFree() {
+
+        LocalDate date = LocalDate.of(2026, 3, 2);
+
+        // Existing bookings
+
+        List<Booking> bookings = List.of(
+                createBooking(date.atTime(8, 0), date.atTime(10, 0)),      // B1
+                createBooking(date.atTime(10, 30), date.atTime(12, 30))    // B2
+        );
+        when(bookingRepository.findByVehicleAndDate(any(), any())).thenReturn(bookings);
+
+        // Case 1: 8:30–10:30 → Not Allowed
+        assertFalse(availabilityService.isVehicleFree(
+                vehicle, date, date.atTime(8, 30), date.atTime(10, 30), null));
+
+        // Case 2: 10:00–12:00 → Not Allowed
+        assertFalse(availabilityService.isVehicleFree(
+                vehicle, date, date.atTime(10, 0), date.atTime(12, 0), null));
+
+        // Case 3: 9:00–11:00 → Allowed
+        assertTrue(availabilityService.isVehicleFree(
+                vehicle, date, date.atTime(9, 0), date.atTime(11, 0), null));
+
+        // Case 4: 9:30–11:30 → Allowed
+        assertTrue(availabilityService.isVehicleFree(
+                vehicle, date, date.atTime(9, 30), date.atTime(11, 30), null));
+
+        // Case 4: 12-14 → Allowed
+        assertTrue(availabilityService.isVehicleFree(
+                vehicle, date, date.atTime(12, 0), date.atTime(14, 0), null));
+
+        // Case 5: 12:30-14:30 -> Not allowed
+        assertFalse(availabilityService.isVehicleFree(
+                vehicle, date, date.atTime(12, 30), date.atTime(14, 0), null));
     }
 
     private Cleaner createCleaner(Long id, String name, Vehicle vehicle) {
